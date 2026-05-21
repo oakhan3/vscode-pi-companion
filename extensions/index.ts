@@ -270,6 +270,8 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", async () => {
+    currentCtx = undefined;
+    isConnected = false;
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = undefined;
