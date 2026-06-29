@@ -90,24 +90,20 @@ class OpenFilesManager {
             }
             this.fireWithDebounce();
         });
-        // Watch for file save (to update content and clear dirty flag)
+        // NOTE: Watch for file save to update content.
         const saveWatcher = vscode.workspace.onDidSaveTextDocument((document) => {
             if (this.isFileUri(document.uri)) {
                 const file = this.openFiles.find((f) => f.path === document.uri.fsPath);
                 if (file) {
                     file.content = document.getText();
-                    file.isDirty = false;
                 }
                 this.fireWithDebounce();
             }
         });
-        // Watch for document changes (to set dirty flag)
+        // NOTE: Watch for document changes so a snapshot is sent when dirty state flips.
+        //       The dirty flag itself is read live in getState, not cached here.
         const changeWatcher = vscode.workspace.onDidChangeTextDocument((event) => {
             if (this.isFileUri(event.document.uri)) {
-                const file = this.openFiles.find((f) => f.path === event.document.uri.fsPath);
-                if (file) {
-                    file.isDirty = event.document.isDirty;
-                }
                 this.fireWithDebounce();
             }
         });
@@ -139,7 +135,6 @@ class OpenFilesManager {
             path: editor.document.uri.fsPath,
             timestamp: Date.now(),
             isActive: true,
-            isDirty: editor.document.isDirty,
         });
         // Enforce max files
         if (this.openFiles.length > MAX_FILES) {
@@ -214,7 +209,11 @@ class OpenFilesManager {
             return null;
         })
             .filter((p) => p !== null);
-        const actualOpenFiles = this.openFiles.filter((f) => openTextEditors.includes(f.path));
+        // NOTE: Read dirty state live from the open documents so it never goes stale.
+        const dirtyByPath = new Map(vscode.workspace.textDocuments.map((doc) => [doc.uri.fsPath, doc.isDirty]));
+        const actualOpenFiles = this.openFiles
+            .filter((file) => openTextEditors.includes(file.path))
+            .map((file) => ({ ...file, isDirty: dirtyByPath.get(file.path) ?? false }));
         return {
             workspaceState: {
                 openFiles: actualOpenFiles,
