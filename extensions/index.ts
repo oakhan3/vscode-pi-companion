@@ -46,7 +46,7 @@ interface ConnectionInfo {
 
 let currentContext: IdeContext | undefined;
 let currentCtx: ExtensionContext | undefined;
-let lastWidgetKey = "";
+let lastInjectedKey: string | undefined;
 let reconnectTimer: NodeJS.Timeout | undefined;
 let sseRequest: http.ClientRequest | undefined;
 let isConnected = false;
@@ -271,6 +271,21 @@ export default function (pi: ExtensionAPI) {
     }
 
     if (!contextText) return;
+
+    // NOTE: Skip re-sending an identical block. When the active context is unchanged
+    //       since the last turn, inject a one-line marker instead of the full block
+    //       so the agent stays oriented to the active file without spending tokens.
+    if (contextText === lastInjectedKey) {
+      return {
+        message: {
+          customType: "pi-companion",
+          content: `Current open file: ${activeFile.path}`,
+          display: false,
+        },
+      };
+    }
+
+    lastInjectedKey = contextText;
     return {
       message: {
         customType: "pi-companion",
@@ -295,6 +310,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_shutdown", async () => {
     currentCtx = undefined;
     isConnected = false;
+    lastInjectedKey = undefined;
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = undefined;
