@@ -11,12 +11,14 @@ import * as os from "os";
 import * as http from "http";
 import { execSync } from "child_process";
 import { Type } from "@sinclair/typebox";
+import {
+  MAX_INJECTED_CHARS,
+  MAX_INJECTED_LINES,
+  PORT_VALIDATE_TIMEOUT_MS,
+  RECONNECT_DELAY_MS,
+} from "./config";
 
 const CONNECTION_DIR = path.join(os.tmpdir(), "pi-companion");
-const WIDGET_DEBOUNCE_MS = 50;
-const RECONNECT_DELAY_MS = 2000;
-const PORT_VALIDATE_TIMEOUT_MS = 750;
-const MAX_INJECTED_LINES = 100;
 
 interface IdeContext {
   workspaceState: {
@@ -45,10 +47,16 @@ interface ConnectionInfo {
 let currentContext: IdeContext | undefined;
 let currentCtx: ExtensionContext | undefined;
 let lastWidgetKey = "";
-let widgetDebounceTimer: NodeJS.Timeout | undefined;
 let reconnectTimer: NodeJS.Timeout | undefined;
 let sseRequest: http.ClientRequest | undefined;
 let isConnected = false;
+
+function capText(text: string): { text: string; truncated: boolean } {
+  if (text.length <= MAX_INJECTED_CHARS) {
+    return { text, truncated: false };
+  }
+  return { text: text.slice(0, MAX_INJECTED_CHARS), truncated: true };
+}
 
 function isRunningInVSCode(): boolean {
   return process.env.TERM_PROGRAM === "vscode";
@@ -247,12 +255,19 @@ export default function (pi: ExtensionAPI) {
     const dirtyNote = activeFile.isDirty ? " (unsaved changes - on-disk content differs from what is shown)" : "";
 
     if (activeFile.selectedText) {
-      contextText = `Current selection in ${activeFile.path}${dirtyNote}:\n\`\`\`\n${activeFile.selectedText}\n\`\`\``;
+      // NOTE: Apply the same char cap as the content path so injected selections stay bounded.
+      const { text: selection, truncated } = capText(activeFile.selectedText);
+      const selectionNote = truncated ? ` (truncated to ${MAX_INJECTED_CHARS} chars)` : "";
+      contextText = `Current selection in ${activeFile.path}${dirtyNote}${selectionNote}:\n\`\`\`\n${selection}\n\`\`\``;
     } else if (activeFile.content) {
       const lines = activeFile.content.split("\n");
-      contextText = lines.length <= MAX_INJECTED_LINES
-        ? `Current file ${activeFile.path}${dirtyNote}:\n\`\`\`\n${activeFile.content}\n\`\`\``
-        : `Current file ${activeFile.path}${dirtyNote} (first ${MAX_INJECTED_LINES} lines):\n\`\`\`\n${lines.slice(0, MAX_INJECTED_LINES).join("\n")}\n\`\`\``;
+      const lineCapped = lines.length > MAX_INJECTED_LINES;
+      const { text: content, truncated: charCapped } = capText(lines.slice(0, MAX_INJECTED_LINES).join("\n"));
+      const notes: string[] = [];
+      if (lineCapped) notes.push(`first ${MAX_INJECTED_LINES} lines`);
+      if (charCapped) notes.push(`truncated to ${MAX_INJECTED_CHARS} chars`);
+      const contentNote = notes.length ? ` (${notes.join(", ")})` : "";
+      contextText = `Current file ${activeFile.path}${dirtyNote}${contentNote}:\n\`\`\`\n${content}\n\`\`\``;
     }
 
     if (!contextText) return;

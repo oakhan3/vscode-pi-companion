@@ -35,8 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OpenFilesManager = void 0;
 const vscode = __importStar(require("vscode"));
-const MAX_FILES = 10;
-const MAX_SELECTED_TEXT_LENGTH = 16384;
+const config_1 = require("./config");
 /**
  * Keeps track of the workspace state: open files, cursor position, and selected text.
  */
@@ -137,7 +136,7 @@ class OpenFilesManager {
             isActive: true,
         });
         // Enforce max files
-        if (this.openFiles.length > MAX_FILES) {
+        if (this.openFiles.length > config_1.MAX_FILES) {
             this.openFiles.pop();
         }
         this.updateActiveContext(editor);
@@ -181,8 +180,8 @@ class OpenFilesManager {
         }
         // Update selected text
         let selectedText = editor.document.getText(editor.selection) || undefined;
-        if (selectedText && selectedText.length > MAX_SELECTED_TEXT_LENGTH) {
-            selectedText = selectedText.substring(0, MAX_SELECTED_TEXT_LENGTH);
+        if (selectedText && selectedText.length > config_1.MAX_SELECTED_TEXT_LENGTH) {
+            selectedText = selectedText.substring(0, config_1.MAX_SELECTED_TEXT_LENGTH);
         }
         file.selectedText = selectedText;
         // Update content

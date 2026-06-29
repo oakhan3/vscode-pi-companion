@@ -1,8 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
-
-const MAX_FILES = 10;
-const MAX_SELECTED_TEXT_LENGTH = 16384;
+import { MAX_FILES, MAX_SELECTED_TEXT_LENGTH } from './config';
 
 interface File {
   path: string;
