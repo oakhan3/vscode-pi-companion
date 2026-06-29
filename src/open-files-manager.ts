@@ -8,6 +8,7 @@ interface File {
   path: string;
   timestamp: number;
   isActive?: boolean;
+  isDirty?: boolean;
   selectedText?: string;
   cursor?: {
     line: number;
@@ -90,12 +91,24 @@ export class OpenFilesManager {
       this.fireWithDebounce();
     });
 
-    // Watch for file save (to update content)
+    // Watch for file save (to update content and clear dirty flag)
     const saveWatcher = vscode.workspace.onDidSaveTextDocument((document) => {
       if (this.isFileUri(document.uri)) {
         const file = this.openFiles.find((f) => f.path === document.uri.fsPath);
         if (file) {
           file.content = document.getText();
+          file.isDirty = false;
+        }
+        this.fireWithDebounce();
+      }
+    });
+
+    // Watch for document changes (to set dirty flag)
+    const changeWatcher = vscode.workspace.onDidChangeTextDocument((event) => {
+      if (this.isFileUri(event.document.uri)) {
+        const file = this.openFiles.find((f) => f.path === event.document.uri.fsPath);
+        if (file) {
+          file.isDirty = event.document.isDirty;
         }
         this.fireWithDebounce();
       }
@@ -108,6 +121,7 @@ export class OpenFilesManager {
       deleteWatcher,
       renameWatcher,
       saveWatcher,
+      changeWatcher,
     );
 
     // Add current active file on startup
@@ -145,6 +159,7 @@ export class OpenFilesManager {
       path: editor.document.uri.fsPath,
       timestamp: Date.now(),
       isActive: true,
+      isDirty: editor.document.isDirty,
     });
 
     // Enforce max files

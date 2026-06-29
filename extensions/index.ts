@@ -24,6 +24,7 @@ interface IdeContext {
       path: string;
       timestamp: number;
       isActive?: boolean;
+      isDirty?: boolean;
       selectedText?: string;
       cursor?: { line: number; character: number };
       selectionStart?: { line: number; character: number };
@@ -159,16 +160,21 @@ function updateWidget(): void {
 
   if (activeFile) {
     const filename = activeFile.path.split("/").pop() || activeFile.path;
+    const isDirty = !!activeFile.isDirty;
     let location = "";
     if (activeFile.selectionStart && activeFile.selectionEnd) {
       const start = activeFile.selectionStart.line;
       const end = activeFile.selectionEnd.line;
       location = start === end ? ` L${start}` : ` L${start}:${end}`;
     }
-    const label = filenames.length === 1
-      ? `${filename}${location}`
-      : `${filename}${location} +${filenames.length - 1}`;
-    currentCtx.ui.setWidget("pi-companion", [label]);
+    const suffix = filenames.length === 1 ? `${location}` : `${location} +${filenames.length - 1}`;
+    currentCtx.ui.setWidget("pi-companion", (_tui, theme) => {
+      const marker = isDirty ? theme.fg("warning", theme.bold("*")) : "";
+      return {
+        render: () => [`${filename}${marker}${suffix}`],
+        invalidate: () => {},
+      };
+    });
     return;
   }
 
@@ -238,13 +244,15 @@ export default function (pi: ExtensionAPI) {
 
     let contextText = "";
 
+    const dirtyNote = activeFile.isDirty ? " (unsaved changes - on-disk content differs from what is shown)" : "";
+
     if (activeFile.selectedText) {
-      contextText = `Current selection in ${activeFile.path}:\n\`\`\`\n${activeFile.selectedText}\n\`\`\``;
+      contextText = `Current selection in ${activeFile.path}${dirtyNote}:\n\`\`\`\n${activeFile.selectedText}\n\`\`\``;
     } else if (activeFile.content) {
       const lines = activeFile.content.split("\n");
       contextText = lines.length <= MAX_INJECTED_LINES
-        ? `Current file ${activeFile.path}:\n\`\`\`\n${activeFile.content}\n\`\`\``
-        : `Current file ${activeFile.path} (first ${MAX_INJECTED_LINES} lines):\n\`\`\`\n${lines.slice(0, MAX_INJECTED_LINES).join("\n")}\n\`\`\``;
+        ? `Current file ${activeFile.path}${dirtyNote}:\n\`\`\`\n${activeFile.content}\n\`\`\``
+        : `Current file ${activeFile.path}${dirtyNote} (first ${MAX_INJECTED_LINES} lines):\n\`\`\`\n${lines.slice(0, MAX_INJECTED_LINES).join("\n")}\n\`\`\``;
     }
 
     if (!contextText) return;
@@ -319,6 +327,7 @@ export default function (pi: ExtensionAPI) {
           type: "text",
           text: JSON.stringify({
             path: activeFile.path,
+            isDirty: activeFile.isDirty,
             cursor: activeFile.cursor,
             selection: activeFile.selectedText,
             content: activeFile.content,
@@ -341,6 +350,7 @@ export default function (pi: ExtensionAPI) {
       const files = currentContext.workspaceState.openFiles.map((f) => ({
         path: f.path,
         isActive: f.isActive,
+        isDirty: f.isDirty,
         cursor: f.cursor,
         hasSelection: !!f.selectedText,
       }));

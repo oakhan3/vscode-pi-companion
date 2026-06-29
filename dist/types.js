@@ -9,6 +9,7 @@ exports.FileSchema = zod_1.z.object({
     path: zod_1.z.string(),
     timestamp: zod_1.z.number(),
     isActive: zod_1.z.boolean().optional(),
+    isDirty: zod_1.z.boolean().optional(),
     selectedText: zod_1.z.string().optional(),
     cursor: zod_1.z.object({
         line: zod_1.z.number(),

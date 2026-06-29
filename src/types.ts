@@ -7,6 +7,7 @@ export const FileSchema = z.object({
   path: z.string(),
   timestamp: z.number(),
   isActive: z.boolean().optional(),
+  isDirty: z.boolean().optional(),
   selectedText: z.string().optional(),
   cursor: z.object({
     line: z.number(),

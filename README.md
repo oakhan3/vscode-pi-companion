@@ -80,4 +80,15 @@ npm run compile
 npx vsce package
 ```
 
+### Install local build
+
+Build, package, and install the local `.vsix` into VS Code:
+
+```bash
+npx vsce package
+code --install-extension vscode-pi-companion-*.vsix --force
+```
+
+Then reload the VS Code window (`Cmd+Shift+P` → "Developer: Reload Window").
+
 Press F5 to run in Extension Development Host.
